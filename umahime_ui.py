@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import date, timedelta
 from itertools import permutations
 import jra_scraper
+import external_scores as ext
 
 st.set_page_config(
     page_title="uma姫AI 予想ビルダー",
@@ -127,8 +128,12 @@ if st.button("🌸 みことの神託を受け取る", use_container_width=True)
         race_info, horses = jra_scraper.get_race_horses(selected_race['race_id'])
         if horses:
             race_ctx = jra_scraper.parse_race_context(race_info)
+            race_id = selected_race['race_id']
             for h in horses:
-                h['score'] = jra_scraper.score_horse(h, horses, race_ctx)
+                my_score = jra_scraper.score_horse(h, horses, race_ctx)
+                ext_score = ext.get_external_score(race_id, h['no'])
+                h['ext_score'] = ext_score  # 元の外部スコア（表示用）
+                h['score'] = ext.blend_score(my_score, ext_score)
             horses_sorted = sorted(horses, key=lambda x: x['score'], reverse=True)
         else:
             horses_sorted = []
@@ -269,15 +274,16 @@ st.markdown("""
 
 # ヘッダー行
 st.markdown("""
-<div style="display:grid;grid-template-columns:40px 40px 52px 1fr 90px 180px;
+<div style="display:grid;grid-template-columns:40px 40px 52px 1fr 70px 70px 160px;
             gap:8px;padding:4px 0;color:#666;font-size:0.75rem;
             border-bottom:1px solid #2a1a2a;margin-bottom:2px;">
   <div style="text-align:center;">印</div>
   <div></div>
   <div style="text-align:center;">馬番</div>
   <div>馬名　騎手</div>
+  <div style="text-align:right;">診断点</div>
   <div style="text-align:right;">指数　オッズ</div>
-  <div style="padding-left:8px;">-1　　0　　1　　2　　3</div>
+  <div style="padding-left:8px;">-1　0　1　2　3</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -319,8 +325,12 @@ for h in horses:
                   height:100%;background:{bar_color};border-radius:9px;"></div>
     </div>"""
 
+    ext_score = h.get('ext_score')
+    ext_str = f"{ext_score:.1f}" if ext_score is not None else "—"
+    ext_color = "#ff8fab" if ext_score and ext_score >= 80 else ("#ffcc66" if ext_score and ext_score >= 60 else "#888")
+
     st.markdown(f"""
-    <div style="display:grid;grid-template-columns:40px 40px 52px 1fr 90px 180px;
+    <div style="display:grid;grid-template-columns:40px 40px 52px 1fr 70px 70px 160px;
                 align-items:center;gap:8px;padding:7px 0;
                 border-bottom:1px solid #1a0f1f;">
       <div style="text-align:center;" class="{mark_cls}">{mark}</div>
@@ -329,6 +339,9 @@ for h in horses:
       <div>
         <div style="font-weight:bold;color:#fff;font-size:0.95rem;">{h['name']}</div>
         <div style="font-size:0.75rem;color:#c090a0;">{h['jockey']}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="color:{ext_color};font-weight:bold;font-size:0.9rem;">{ext_str}</div>
       </div>
       <div style="text-align:right;">
         <div class="{score_cls}">{score:.3f}</div>
